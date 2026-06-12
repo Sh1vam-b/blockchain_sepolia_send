@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERC20 Token Transfer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+        button { padding: 12px 24px; font-size: 16px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 5px; font-weight: bold;}
+        button:hover { background-color: #0056b3; }
+        #status { margin-top: 25px; font-size: 18px; line-height: 1.5; white-space: pre-wrap; }
+        .success { color: #28a745; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+        .loading { color: #f6851b; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h2>Sende 10 ERC20 Tokens</h2>
+    <p>Klicke auf den Button, um 10 Tokens an die Adresse aus der Aufgabe zu senden.</p>
+    
+    <button id="transferBtn">10 Tokens senden</button>
+    
+    <div id="status"></div>
+
+    <script>
+        // ERC20 Contract Adresse
+        const CONTRACT_ADDRESS = "0xaFce5796322e8E0DEbf8aB80274f7Fc3f7968188";
+        
+        // Zieladresse
+        const RECIPIENT_ADDRESS = "0x15433DA387451F9dE4565280C85506CB71aF9376";
+        // Menge an Tokens, die gesendet werden soll
+        const AMOUNT_TO_SEND = "10";
+
+        // minimale ABI
+        const MINIMAL_ABI = [
+            "function transfer(address to, uint256 amount) returns (bool)"
+        ];
+
+        document.getElementById('transferBtn').addEventListener('click', async () => {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = "loading";
+            statusDiv.innerText = "Verbinde mit MetaMask...";
+
+            if (typeof window.ethereum === 'undefined') {
+                statusDiv.className = "error";
+                statusDiv.innerText = "Fehler: MetaMask ist nicht installiert!";
+                return;
+            }
+
+            try {
+                // Erlaubnis von MetaMask einholen
+                await window.ethereum.request({ method: 'eth_requestAccounts' });
+
+                // Provider und SIGNER initialisieren
+                const provider = new ethers.BrowserProvider(window.ethereum);
+                const signer = await provider.getSigner();
+                
+                // Prüfen, ob wir im Sepolia Netzwerk sind
+                const network = await provider.getNetwork();
+                if (network.chainId !== 11155111n) {
+                    statusDiv.className = "error";
+                    statusDiv.innerText = "Fehler: Bitte wechsle in MetaMask zum Sepolia Testnetzwerk!";
+                    return;
+                }
+
+                // Contract initialisieren
+                const contract = new ethers.Contract(CONTRACT_ADDRESS, MINIMAL_ABI, signer);
+
+                // Betrag in die EVM-Einheit umrechnen
+                const amountInWei = ethers.parseUnits(AMOUNT_TO_SEND, 18);
+
+                statusDiv.innerText = "Bitte bestätige die Transaktion in deinem MetaMask Pop-up...";
+
+                // Die Transfer-Funktion auf der Blockchain aufrufen
+                const tx = await contract.transfer(RECIPIENT_ADDRESS, amountInWei);
+                
+                statusDiv.innerText = "Transaktion gesendet! Warte auf Bestätigung der Blockchain (das dauert ein paar Sekunden)...\n\nTransaktions-Hash:\n" + tx.hash;
+
+                // Warten, bis die Transaktion in einen Block geschrieben wurde
+                await tx.wait();
+
+                statusDiv.className = "success";
+                statusDiv.innerText = "Erfolg! Die 10 Tokens wurden erfolgreich versendet.\n\nTransaktions-Hash:\n" + tx.hash;
+
+            } catch (error) {
+                console.error(error);
+                statusDiv.className = "error";
+                // MetaMask Fehlermeldungen lesbarer machen
+                const errorMsg = error.reason || error.message;
+                statusDiv.innerText = "Ein Fehler ist aufgetreten: " + errorMsg;
+            }
+        });
+    </script>
+</body>
+</html>
